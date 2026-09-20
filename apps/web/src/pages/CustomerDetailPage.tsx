@@ -106,32 +106,22 @@ export function CustomerDetailPage() {
         </section>
       ) : (
         <section className="rounded-2xl bg-surface p-4 shadow-sm">
-          <dl className="space-y-2 text-sm">
-            {customer.furigana && (
-              <div>
-                <dt className="text-ink-3">ふりがな</dt>
-                <dd>{customer.furigana}</dd>
-              </div>
-            )}
+          <div className="space-y-1 text-sm">
+            {customer.furigana && <p className="text-ink-3">{customer.furigana}</p>}
             {customer.phone && (
-              <div>
-                <dt className="text-ink-3">電話</dt>
-                <dd>{customer.phone}</dd>
-              </div>
+              <p>
+                <a href={`tel:${customer.phone}`} className="font-semibold text-accent">
+                  {customer.phone}
+                </a>
+              </p>
             )}
-            {customer.email && (
-              <div>
-                <dt className="text-ink-3">メール</dt>
-                <dd>{customer.email}</dd>
-              </div>
-            )}
+            {customer.email && <p className="text-ink-2">{customer.email}</p>}
             {customer.notes && (
-              <div>
-                <dt className="text-ink-3">メモ</dt>
-                <dd className="whitespace-pre-wrap">{customer.notes}</dd>
-              </div>
+              <p className="whitespace-pre-wrap border-t border-border pt-2 text-ink-2">
+                {customer.notes}
+              </p>
             )}
-          </dl>
+          </div>
         </section>
       )}
 

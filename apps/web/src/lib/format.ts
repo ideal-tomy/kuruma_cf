@@ -25,3 +25,13 @@ export function formatYen(amount: number): string {
 export function formatPrice(amount: number): string {
   return `¥${amount.toLocaleString('ja-JP')}`;
 }
+
+/** 見積タブ用。内部の見積番号（QT-… / DEMO-…）はユーザーに見せない */
+export function formatQuoteTabLabel(
+  quote: { grandTotal: number; totalAmount: number; issuedAt: string | null; createdAt: string },
+  index: number,
+): string {
+  const price = formatPrice(quote.grandTotal || quote.totalAmount);
+  if (index === 0) return `最新 ${price}`;
+  return `${formatDate(quote.issuedAt ?? quote.createdAt)} ${price}`;
+}

@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import type { SendFlowLocationState } from '../lib/sendFlow';
 import { fetchVehicleQuotes, generateQuote, updateQuote } from '../lib/api';
 import type { Quote, QuoteLineItem } from '../lib/types';
-import { formatPrice, formatYen } from '../lib/format';
+import { formatPrice, formatQuoteTabLabel, formatYen } from '../lib/format';
 import { Button } from '../components/ui/Button';
 import { Field, inputClass } from '../components/ui/Field';
 import { ShareLinkRow } from '../components/ui/ShareLinkRow';
@@ -200,7 +200,7 @@ export function QuoteEditPage() {
 
       {quotes.length > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-1">
-          {quotes.map((q) => (
+          {quotes.map((q, index) => (
             <button
               key={q.id}
               type="button"
@@ -210,7 +210,7 @@ export function QuoteEditPage() {
               ].join(' ')}
               onClick={() => selectQuote(q.id)}
             >
-              {q.quoteNo}
+              {formatQuoteTabLabel(q, index)}
             </button>
           ))}
         </div>

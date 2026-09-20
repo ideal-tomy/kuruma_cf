@@ -9,15 +9,12 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
   ].join(' ');
 
 export function AppShell() {
-  const { logout, shopName } = useAuth();
+  const { logout } = useAuth();
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-lg flex-col bg-bg">
       <header className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-border bg-surface/95 px-4 py-3 backdrop-blur-sm">
-        <div>
-          <h1 className="text-lg font-bold text-ink">Shaken Notify</h1>
-          <p className="text-xs text-ink-3">{shopName ?? '整備工場'}</p>
-        </div>
+        <h1 className="text-lg font-bold text-ink">Shaken Notify</h1>
         <Button variant="ghost" className="min-h-11 px-2 py-1 text-xs" onClick={() => logout()}>
           ログアウト
         </Button>
