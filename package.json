@@ -1,0 +1,35 @@
+{
+  "name": "kuruma-cf",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "apps/web",
+    "workers/app",
+    "packages/quote"
+  ],
+  "scripts": {
+    "dev": "npm run build:web && wrangler dev --port 8788",
+    "dev:web": "npm run dev -w @kuruma-cf/web",
+    "build": "npm run build -w @kuruma-cf/web",
+    "build:web": "npm run build -w @kuruma-cf/web",
+    "deploy": "npm run build && wrangler deploy",
+    "deploy:production": "npm run build && wrangler deploy && npm run secrets:production && npm run db:migrate:remote && npm run db:seed:remote",
+    "secrets:generate": "node scripts/generate-production-secrets.mjs",
+    "secrets:production": "wrangler secret bulk .production-secrets.json",
+    "secrets:line": "node scripts/register-line-secrets.mjs",
+    "db:migrate:local": "wrangler d1 migrations apply kuruma-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply kuruma-db --remote",
+    "db:seed:local": "wrangler d1 execute kuruma-db --local --file=seed/demo.sql",
+    "db:seed:remote": "wrangler d1 execute kuruma-db --remote --file=seed/demo.sql",
+    "seed:generate": "node scripts/generate-seed.mjs",
+    "cron:dry-run": "curl -s -b tmp-cookies.txt -X POST http://localhost:8788/api/cron/daily-extract",
+    "typecheck": "npm run typecheck -w @kuruma-cf/web && npm run typecheck -w @kuruma-cf/app"
+  },
+  "devDependencies": {
+    "wrangler": "^4.14.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

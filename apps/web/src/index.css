@@ -1,0 +1,52 @@
+@import 'tailwindcss';
+
+:root {
+  color-scheme: light only;
+  --bg: #faf8f5;
+  --surface: #ffffff;
+  --surface-2: #f4f1ec;
+  --border: #e8e3db;
+  --ink: #1a1814;
+  --ink-2: #4a4640;
+  --ink-3: #8a8478;
+  --accent: #2d4a3e;
+  --accent-soft: #e8efe9;
+  --warn: #b85c2e;
+  --warn-soft: #fbeee3;
+  --danger: #a83232;
+  --danger-soft: #f7e4e4;
+  --line-green: #06c755;
+}
+
+@theme {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-line-green: var(--line-green);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  min-height: 100dvh;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP',
+    'Yu Gothic', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+.production-secrets.json
+.line-secrets.tmp.json
+tmp-prod-*.json
+*.local
+.DS_Store

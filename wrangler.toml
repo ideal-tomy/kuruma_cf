@@ -1,0 +1,41 @@
+# kuruma — Cloudflare Workers + Static Assets + D1
+# 正本: docs/cf-rebuild/kuruma-実装PLAN.md
+#
+# nail_cf とリソースを共有しない（別 D1 / 別 Worker 名）
+#
+# 初回デプロイ前:
+#   1. wrangler login
+#   2. wrangler d1 create kuruma-db  → database_id を下記に反映
+#   3. npm run db:migrate:remote
+#   4. npm run deploy
+
+name = "kuruma-cf"
+main = "workers/app/src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "apps/web/dist"
+not_found_handling = "single-page-application"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "kuruma-db"
+# ローカル開発は wrangler が自動生成。本番: wrangler d1 create kuruma-db
+database_id = "2d6fe9c8-d764-4fc6-9a3a-9e4c61fed572"
+migrations_dir = "migrations"
+
+[vars]
+DEMO_EMAIL = "demo@example.com"
+AUTO_SEND_ENABLED = "false"
+SITE_URL = "https://kuruma-cf.ryojitomii.workers.dev"
+ISSUER_JSON = "{\"companyName\":\"デモ整備工場\",\"phone\":\"045-000-0000\",\"address\":\"神奈川県横浜市\"}"
+NOTIFICATION_IDEMPOTENCY_DISABLED = "false"
+
+# 秘密情報（SESSION / ポータル / LINE）は wrangler secret で設定。
+# ローカル開発は .dev.vars（.env.example 参照）。
+
+# 毎日 08:00 JST（UTC 23:00）。AUTO_SEND_ENABLED=false の間は dry-run のみ
+[triggers]
+crons = ["0 23 * * *"]
