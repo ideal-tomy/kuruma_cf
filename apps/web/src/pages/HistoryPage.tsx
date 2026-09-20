@@ -1,92 +1,188 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { fetchNotificationLogs, retryNotifications } from '../lib/api';
 import type { NotificationJob } from '../lib/types';
+import { HistoryJobCard } from '../components/history/HistoryJobCard';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { SubPageHeader } from '../components/ui/SubPageHeader';
-import { formatDate } from '../lib/format';
+
+type Filter = 'action' | 'all';
 
 export function HistoryPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialFilter: Filter = searchParams.get('view') === 'all' ? 'all' : 'action';
+
   const [jobs, setJobs] = useState<NotificationJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'FAILED'>('all');
+  const [filter, setFilter] = useState<Filter>(initialFilter);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [retryAll, setRetryAll] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
-  const reload = () =>
-    fetchNotificationLogs(filter === 'FAILED' ? { status: 'FAILED' } : {})
-      .then(setJobs)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : '読み込みに失敗しました'));
+  const reload = useCallback(async () => {
+    const rows = await fetchNotificationLogs(filter === 'action' ? { status: 'FAILED' } : {});
+    setJobs(rows);
+    return rows;
+  }, [filter]);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
-    reload().finally(() => setLoading(false));
-  }, [filter]);
+    setError(null);
+    reload()
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : '読み込みに失敗しました');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reload]);
+
+  const failedJobs = useMemo(() => jobs.filter((j) => j.status === 'FAILED'), [jobs]);
+  const sentJobs = useMemo(() => jobs.filter((j) => j.status !== 'FAILED'), [jobs]);
+
+  const setFilterAndUrl = (next: Filter) => {
+    setFilter(next);
+    if (next === 'action') {
+      setSearchParams({});
+    } else {
+      setSearchParams({ view: 'all' });
+    }
+  };
+
+  const handleRetry = async (jobId: string) => {
+    setRetryingId(jobId);
+    setMessage(null);
+    try {
+      await retryNotifications([jobId]);
+      setMessage('再送しました');
+      await reload();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '再送に失敗しました');
+    } finally {
+      setRetryingId(null);
+    }
+  };
+
+  const handleRetryAll = async () => {
+    if (failedJobs.length === 0) return;
+    setRetryAll(true);
+    setMessage(null);
+    try {
+      await retryNotifications(failedJobs.map((j) => j.id));
+      setMessage(`${failedJobs.length}件を再送しました`);
+      await reload();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '一括再送に失敗しました');
+    } finally {
+      setRetryAll(false);
+    }
+  };
+
+  const showFailedSection = filter === 'action' ? jobs : failedJobs;
+  const showSentSection = filter === 'all' ? sentJobs : [];
 
   return (
     <div className="space-y-4">
-      <SubPageHeader backTo="/" backLabel="ホーム" title="送信履歴" />
+      <SubPageHeader
+        backTo="/"
+        backLabel="ホーム"
+        title="送信履歴"
+        subtitle="失敗した送信を確認して再送できます"
+      />
 
       <div className="flex gap-2">
         <Button
+          variant={filter === 'action' ? 'primary' : 'secondary'}
+          className="min-h-11 flex-1 text-sm"
+          onClick={() => setFilterAndUrl('action')}
+        >
+          要再送
+        </Button>
+        <Button
           variant={filter === 'all' ? 'primary' : 'secondary'}
-          className="text-xs"
-          onClick={() => setFilter('all')}
+          className="min-h-11 flex-1 text-sm"
+          onClick={() => setFilterAndUrl('all')}
         >
           すべて
         </Button>
-        <Button
-          variant={filter === 'FAILED' ? 'primary' : 'secondary'}
-          className="text-xs"
-          onClick={() => setFilter('FAILED')}
-        >
-          失敗のみ
-        </Button>
       </div>
 
+      {message && (
+        <p className="rounded-xl bg-accent-soft px-3 py-2 text-sm font-medium text-accent">{message}</p>
+      )}
       {loading && <p className="text-sm text-ink-3">読み込み中…</p>}
       {error && <p className="text-sm text-danger">{error}</p>}
 
-      {!loading && jobs.length === 0 && (
+      {!loading && filter === 'action' && jobs.length === 0 && (
+        <EmptyState
+          title="送信失敗はありません"
+          description="問題がなければホームに戻って案内作業を続けられます"
+        />
+      )}
+
+      {!loading && filter === 'all' && jobs.length === 0 && (
         <EmptyState title="送信履歴がありません" />
       )}
 
-      <ul className="space-y-2">
-        {jobs.map((job) => (
-          <li key={job.id} className="rounded-2xl bg-surface px-4 py-3 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-semibold text-ink">{job.customerName}</p>
-                <p className="mt-1 text-xs text-ink-3">
-                  {job.ruleKey} · {job.channel} · {formatDate(job.createdAt)}
-                </p>
-                {job.lastError && (
-                  <p className="mt-2 text-xs text-danger">{job.lastError}</p>
-                )}
-              </div>
-              <span
-                className={[
-                  'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold',
-                  job.status === 'SENT' ? 'bg-accent-soft text-accent' : 'bg-danger/10 text-danger',
-                ].join(' ')}
-              >
-                {job.status}
-              </span>
-            </div>
-            {job.status === 'FAILED' && (
+      {!loading && showFailedSection.length > 0 && (
+        <section className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-bold text-danger">
+              要再送 {showFailedSection.length}件
+            </p>
+            {showFailedSection.length > 1 && filter === 'action' && (
               <Button
                 variant="secondary"
-                className="mt-3 text-xs"
-                onClick={async () => {
-                  await retryNotifications([job.id]);
-                  await reload();
-                }}
+                className="min-h-11 text-xs"
+                disabled={retryAll}
+                onClick={() => void handleRetryAll()}
               >
-                再送
+                {retryAll ? '再送中…' : 'すべて再送'}
               </Button>
             )}
-          </li>
-        ))}
-      </ul>
+          </div>
+          <ul className="space-y-3">
+            {showFailedSection.map((job) => (
+              <HistoryJobCard
+                key={job.id}
+                job={job}
+                retrying={retryingId === job.id || retryAll}
+                onRetry={() => void handleRetry(job.id)}
+              />
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {!loading && showSentSection.length > 0 && (
+        <section className="space-y-2">
+          <p className="text-sm font-bold text-ink-2">送信済み</p>
+          <ul className="space-y-2">
+            {showSentSection.map((job) => (
+              <HistoryJobCard
+                key={job.id}
+                job={job}
+                retrying={false}
+                onRetry={() => {}}
+              />
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {!loading && filter === 'all' && failedJobs.length === 0 && sentJobs.length > 0 && (
+        <p className="text-center text-xs text-ink-3">
+          <Link to="/" className="text-accent">
+            ホームへ戻る
+          </Link>
+        </p>
+      )}
     </div>
   );
 }

@@ -7,14 +7,25 @@ type Props = {
   title: string;
   subtitle?: string;
   action?: ReactNode;
+  onBack?: () => void;
 };
 
-export function SubPageHeader({ backTo, backLabel, title, subtitle, action }: Props) {
+export function SubPageHeader({ backTo, backLabel, title, subtitle, action, onBack }: Props) {
   return (
     <div className="space-y-3">
-      <Link to={backTo} className="inline-block text-sm font-semibold text-accent">
-        ‹ {backLabel}
-      </Link>
+      {onBack ? (
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-block text-sm font-semibold text-accent"
+        >
+          ‹ {backLabel}
+        </button>
+      ) : (
+        <Link to={backTo} className="inline-block text-sm font-semibold text-accent">
+          ‹ {backLabel}
+        </Link>
+      )}
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-ink">{title}</h2>

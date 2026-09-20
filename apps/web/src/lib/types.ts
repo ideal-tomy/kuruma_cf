@@ -127,6 +127,7 @@ export type NotificationJob = {
   customerName: string;
   customerPhone: string | null;
   vehicleId: string | null;
+  vehiclePlate?: string | null;
   ruleKey: string;
   channel: string;
   templateKey: string;

@@ -24,7 +24,8 @@ export type HomeResponse = {
     lineUnmatched: number;
     sendFailed: number;
   };
-  lists: { rule: string; count: number }[];
+  lists: { rule: string; count: number; urgency?: string }[];
+  shopName?: string | null;
   phase: number;
 };
 
@@ -58,7 +59,11 @@ export async function fetchList(rule: string): Promise<ListResponse> {
   return request<ListResponse>(`/api/lists/${encodeURIComponent(rule)}`);
 }
 
-export async function fetchMe(): Promise<{ authenticated: boolean; email?: string } | null> {
+export async function fetchMe(): Promise<{
+  authenticated: boolean;
+  email?: string;
+  shopName?: string | null;
+} | null> {
   const res = await fetch('/api/auth/me', { credentials: 'include' });
   if (res.status === 401) return null;
   if (!res.ok) throw new Error('Failed to fetch session');
@@ -172,11 +177,26 @@ export async function listServiceHistories(vehicleId: string): Promise<ServiceHi
   return data.histories;
 }
 
+export type NotificationPreviewSummary = {
+  hasQuote: boolean;
+  grandTotal: string;
+  legalFeesTotal: string;
+  minimumTotal: string;
+  baseInspectionFee: string;
+  portalUrl: string;
+  quoteUrl: string;
+};
+
 export async function previewNotification(input: {
   customerId: string;
   vehicleId: string;
   rule: string;
-}): Promise<{ content: string; templateKey: string; ruleKey: string }> {
+}): Promise<{
+  content: string;
+  templateKey: string;
+  ruleKey: string;
+  summary: NotificationPreviewSummary;
+}> {
   return request('/api/notifications/preview', {
     method: 'POST',
     body: JSON.stringify({

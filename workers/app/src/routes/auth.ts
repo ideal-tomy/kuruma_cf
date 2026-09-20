@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { AppEnv } from '../env';
 import { badRequest } from '../lib/errors';
+import { parseIssuerFromJson } from '../lib/issuer';
 import { createSessionToken, SESSION_COOKIE, verifySessionToken } from '../lib/session';
 
 const auth = new Hono<AppEnv>();
@@ -46,7 +47,12 @@ auth.get('/me', async (c) => {
   const token = getCookie(c, SESSION_COOKIE);
   const session = await verifySessionToken(token, c.env.SESSION_SECRET);
   if (!session) return c.json({ authenticated: false }, 401);
-  return c.json({ authenticated: true, email: session.email });
+  const issuer = parseIssuerFromJson(c.env.ISSUER_JSON);
+  return c.json({
+    authenticated: true,
+    email: session.email,
+    shopName: issuer?.companyName ?? null,
+  });
 });
 
 export { auth };

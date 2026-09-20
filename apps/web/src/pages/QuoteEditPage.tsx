@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import type { SendFlowLocationState } from '../lib/sendFlow';
 import { fetchVehicleQuotes, generateQuote, updateQuote } from '../lib/api';
 import type { Quote, QuoteLineItem } from '../lib/types';
 import { formatPrice, formatYen } from '../lib/format';
@@ -7,6 +8,7 @@ import { Button } from '../components/ui/Button';
 import { Field, inputClass } from '../components/ui/Field';
 import { ShareLinkRow } from '../components/ui/ShareLinkRow';
 import { SubPageHeader } from '../components/ui/SubPageHeader';
+import { Toast } from '../components/ui/Toast';
 
 function copyText(text: string) {
   void navigator.clipboard.writeText(text);
@@ -14,6 +16,9 @@ function copyText(text: string) {
 
 export function QuoteEditPage() {
   const { vehicleId } = useParams<{ vehicleId: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const fromSend = (location.state as SendFlowLocationState | null)?.fromSend;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [vehicleLabel, setVehicleLabel] = useState('');
@@ -28,6 +33,7 @@ export function QuoteEditPage() {
   const [optOutUrl, setOptOutUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const activeQuote = useMemo(
     () => quotes.find((q) => q.id === activeQuoteId) ?? null,
@@ -159,11 +165,24 @@ export function QuoteEditPage() {
     </section>
   );
 
+  const returnToSend = () => {
+    if (!fromSend) return;
+    navigate(`/lists/${fromSend.rule}`, { state: { reopenSend: fromSend } });
+  };
+
   return (
     <div className="space-y-4">
+      {fromSend && (
+        <div className="rounded-xl bg-warn-soft/60 px-3 py-2 text-sm text-ink-2">
+          送信前の見積調整 — 保存後「送信確認へ戻る」で LINE 送信を続けられます
+        </div>
+      )}
+      {toast && <Toast message={toast} />}
+
       <SubPageHeader
         backTo={customerId ? `/customers/${customerId}` : '/customers'}
-        backLabel="顧客詳細"
+        backLabel={fromSend ? '送信確認へ' : '顧客詳細'}
+        onBack={fromSend ? returnToSend : undefined}
         title="見積編集"
         subtitle={vehicleLabel}
         action={
@@ -219,6 +238,7 @@ export function QuoteEditPage() {
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Button
+                className="min-h-11 flex-1"
                 disabled={saving}
                 onClick={async () => {
                   if (!activeQuoteId) return;
@@ -231,13 +251,22 @@ export function QuoteEditPage() {
                       status: 'ISSUED',
                     });
                     await reload();
+                    setToast('保存して発行しました');
+                    if (fromSend) {
+                      setTimeout(returnToSend, 500);
+                    }
                   } finally {
                     setSaving(false);
                   }
                 }}
               >
-                {saving ? '保存中…' : '保存して発行'}
+                {saving ? '保存中…' : fromSend ? '保存して送信確認へ' : '保存して発行'}
               </Button>
+              {fromSend && (
+                <Button variant="secondary" className="min-h-11" onClick={returnToSend}>
+                  送信確認へ戻る
+                </Button>
+              )}
             </div>
           </section>
 
@@ -254,6 +283,7 @@ export function QuoteEditPage() {
                   onCopy={() => {
                     copyText(shareUrl);
                     setCopied('quote');
+                    setToast('リンクをコピーしました');
                   }}
                 />
               )}
@@ -266,6 +296,7 @@ export function QuoteEditPage() {
                   onCopy={() => {
                     copyText(portalUrl);
                     setCopied('portal');
+                    setToast('リンクをコピーしました');
                   }}
                 />
               )}
@@ -278,6 +309,7 @@ export function QuoteEditPage() {
                   onCopy={() => {
                     copyText(optOutUrl);
                     setCopied('optout');
+                    setToast('リンクをコピーしました');
                   }}
                 />
               )}

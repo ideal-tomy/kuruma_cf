@@ -39,11 +39,21 @@ notifications.post('/preview', async (c) => {
 
   const vars = await buildMessageVariables(c.env, c.env.DB, target);
   try {
+    const hasQuote = vars.grandTotal !== '（見積未発行）';
     return c.json({
       subject: template.subject ? renderNotificationTemplate(template.subject, vars) : null,
       content: renderNotificationTemplate(template.content, vars),
       templateKey,
       ruleKey: isListRule(body.rule) ? LIST_TO_RULE_KEY[body.rule] : body.rule,
+      summary: {
+        hasQuote,
+        grandTotal: vars.grandTotal,
+        legalFeesTotal: vars.legalFeesTotal,
+        minimumTotal: vars.minimumTotal,
+        baseInspectionFee: vars.baseInspectionFee,
+        portalUrl: vars.portalUrl,
+        quoteUrl: vars.quoteUrl,
+      },
     });
   } catch (error) {
     return c.json(
@@ -105,9 +115,10 @@ notifications.get('/logs', async (c) => {
   const unresolved = c.req.query('unresolved') === '1';
 
   let sql = `
-    SELECT j.*, c.name as customer_name, c.phone as customer_phone
+    SELECT j.*, c.name as customer_name, c.phone as customer_phone, v.plate as vehicle_plate
     FROM notification_jobs j
     JOIN customers c ON c.id = j.customer_id
+    LEFT JOIN vehicles v ON v.id = j.vehicle_id
     WHERE 1=1
   `;
   const binds: string[] = [];
@@ -122,11 +133,18 @@ notifications.get('/logs', async (c) => {
     sql += ' AND (c.name LIKE ? OR j.template_key LIKE ? OR j.rule_key LIKE ?)';
     binds.push(`%${q}%`, `%${q}%`, `%${q}%`);
   }
-  sql += ' ORDER BY j.created_at DESC LIMIT 200';
+  sql += ` ORDER BY
+    CASE j.status WHEN 'FAILED' THEN 0 WHEN 'PENDING' THEN 1 ELSE 2 END,
+    j.created_at DESC
+    LIMIT 200`;
 
   const stmt = c.env.DB.prepare(sql);
   const { results } = await (binds.length ? stmt.bind(...binds) : stmt).all<
-    NotificationJobRow & { customer_name: string; customer_phone: string | null }
+    NotificationJobRow & {
+      customer_name: string;
+      customer_phone: string | null;
+      vehicle_plate: string | null;
+    }
   >();
 
   return c.json({
@@ -136,6 +154,7 @@ notifications.get('/logs', async (c) => {
       customerName: row.customer_name,
       customerPhone: row.customer_phone,
       vehicleId: row.vehicle_id,
+      vehiclePlate: row.vehicle_plate,
       ruleKey: row.rule_key,
       channel: row.channel,
       templateKey: row.template_key,

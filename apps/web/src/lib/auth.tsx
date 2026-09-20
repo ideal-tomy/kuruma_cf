@@ -3,6 +3,7 @@ import { fetchMe, login as apiLogin, logout as apiLogout } from './api';
 
 type AuthContextValue = {
   email: string | null;
+  shopName: string | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -12,14 +13,17 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [email, setEmail] = useState<string | null>(null);
+  const [shopName, setShopName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     try {
       const me = await fetchMe();
       setEmail(me?.email ?? null);
+      setShopName(me?.shopName ?? null);
     } catch {
       setEmail(null);
+      setShopName(null);
     }
   }, []);
 
@@ -35,10 +39,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     await apiLogout();
     setEmail(null);
+    setShopName(null);
   };
 
   return (
-    <AuthContext.Provider value={{ email, loading, login, logout }}>
+    <AuthContext.Provider value={{ email, shopName, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
