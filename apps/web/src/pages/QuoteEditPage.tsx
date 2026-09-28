@@ -4,6 +4,7 @@ import type { SendFlowLocationState } from '../lib/sendFlow';
 import { fetchVehicleQuotes, generateQuote, updateQuote } from '../lib/api';
 import type { Quote, QuoteLineItem } from '../lib/types';
 import { formatPrice, formatQuoteTabLabel, formatYen } from '../lib/format';
+import { sameOriginHref, staffPreviewHref } from '../lib/previewUrl';
 import { Button } from '../components/ui/Button';
 import { Field, inputClass } from '../components/ui/Field';
 import { ShareLinkRow } from '../components/ui/ShareLinkRow';
@@ -12,19 +13,6 @@ import { Toast } from '../components/ui/Toast';
 
 function copyText(text: string) {
   void navigator.clipboard.writeText(text);
-}
-
-function sameOriginHref(absoluteUrl: string): string {
-  const parsed = new URL(absoluteUrl, window.location.origin);
-  return `${window.location.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
-}
-
-function staffPreviewHref(absoluteUrl: string): string {
-  const parsed = new URL(absoluteUrl, window.location.origin);
-  const next = new URL(`${parsed.pathname}${parsed.search}`, window.location.origin);
-  next.searchParams.set('preview', '1');
-  next.hash = parsed.hash;
-  return next.toString();
 }
 
 const EMPTY_SERVICE_LINE: QuoteLineItem = {
@@ -122,6 +110,12 @@ export function QuoteEditPage() {
       cancelled = true;
     };
   }, [vehicleId, reload]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const selectQuote = async (id: string) => {
     if (!vehicleId) return;
@@ -285,18 +279,40 @@ export function QuoteEditPage() {
     navigate(`/lists/${fromSend.rule}`, { state: { reopenSend: fromSend } });
   };
 
-  return (
-    <div className="space-y-4">
-      {fromSend && (
-        <div className="rounded-xl bg-warn-soft/60 px-3 py-2 text-sm text-ink-2">
-          送信前の見積調整 — 保存後「送信確認へ戻る」で LINE 送信を続けられます
-        </div>
-      )}
-      {toast && <Toast message={toast} />}
+  const backTo = customerId ? `/customers/${customerId}` : '/customers';
 
+  const handleSave = async () => {
+    if (!activeQuoteId) return;
+    if (serviceItems.some((item) => !item.label.trim())) {
+      setSaveError('項目名が空の行があります。名前を入れるか、その行を削除してください。');
+      return;
+    }
+    setSaveError(null);
+    setSaving(true);
+    try {
+      await updateQuote(activeQuoteId, {
+        legalItems,
+        serviceItems,
+        notes,
+        status: 'ISSUED',
+      });
+      await reload();
+      setToast('保存しました。お客様の画面にも反映されています');
+      if (fromSend) {
+        setTimeout(returnToSend, 500);
+      }
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : '保存に失敗しました');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className={activeQuote ? 'space-y-4 pb-32' : 'space-y-4'}>
       <SubPageHeader
-        backTo={customerId ? `/customers/${customerId}` : '/customers'}
-        backLabel={fromSend ? '送信確認へ' : '顧客詳細'}
+        backTo={backTo}
+        backLabel={fromSend ? '送信確認' : '顧客詳細'}
         onBack={fromSend ? returnToSend : undefined}
         title="見積編集"
         subtitle={vehicleLabel}
@@ -312,6 +328,12 @@ export function QuoteEditPage() {
           </Button>
         }
       />
+
+      {fromSend && (
+        <div className="rounded-xl bg-warn-soft/60 px-3 py-2 text-sm text-ink-2">
+          送信前の見積の確認です。保存すると送信確認に戻ります。
+        </div>
+      )}
 
       {quotes.length > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-1">
@@ -348,54 +370,13 @@ export function QuoteEditPage() {
                 onChange={(e) => setNotes(e.target.value)}
               />
             </Field>
-            <p className="mt-4 text-right text-lg font-bold text-accent">
-              合計 {formatPrice(grandTotal)}
-            </p>
-            {saveError && <p className="mt-3 text-sm text-danger">{saveError}</p>}
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button
-                className="min-h-11 flex-1"
-                disabled={saving}
-                onClick={async () => {
-                  if (!activeQuoteId) return;
-                  if (serviceItems.some((item) => !item.label.trim())) {
-                    setSaveError('項目名が空の行があります。名前を入れるか、その行を削除してください。');
-                    return;
-                  }
-                  setSaveError(null);
-                  setSaving(true);
-                  try {
-                    await updateQuote(activeQuoteId, {
-                      legalItems,
-                      serviceItems,
-                      notes,
-                      status: 'ISSUED',
-                    });
-                    await reload();
-                    setToast('保存して発行しました');
-                    if (fromSend) {
-                      setTimeout(returnToSend, 500);
-                    }
-                  } catch (err: unknown) {
-                    setSaveError(err instanceof Error ? err.message : '保存に失敗しました');
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-              >
-                {saving ? '保存中…' : fromSend ? '保存して送信確認へ' : '保存して発行'}
-              </Button>
-              {fromSend && (
-                <Button variant="secondary" className="min-h-11" onClick={returnToSend}>
-                  送信確認へ戻る
-                </Button>
-              )}
-            </div>
           </section>
 
           <section className="rounded-2xl bg-accent-soft/40 p-4">
-            <p className="text-sm font-bold text-accent">共有リンク</p>
-            <p className="mt-1 text-xs text-ink-3">LINE 送信前に「コピー」で貼り付け、または「開く」でプレビュー</p>
+            <p className="text-sm font-bold text-accent">お客様に見える画面</p>
+            <p className="mt-1 text-xs text-ink-3">
+              「開く」で保存済みの内容を確認できます。「コピー」は LINE などに貼り付ける用です。
+            </p>
             <ul className="mt-3 space-y-2">
               {shareUrl && (
                 <ShareLinkRow
@@ -442,6 +423,34 @@ export function QuoteEditPage() {
             </ul>
           </section>
         </>
+      )}
+
+      {activeQuote && (
+        <div className="fixed inset-x-0 bottom-[calc(3.6rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-lg border-t border-border bg-surface/95 px-4 pt-2 pb-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur-sm">
+          {toast && <Toast message={toast} />}
+          {saveError && <Toast message={saveError} tone="error" />}
+          <div className="mt-2 flex items-center justify-between text-sm">
+            <span className="text-ink-3">合計（税込）</span>
+            <span className="text-lg font-bold tabular-nums text-accent">{formatPrice(grandTotal)}</span>
+          </div>
+          <div className="mt-2 flex gap-2">
+            {fromSend ? (
+              <Button variant="secondary" className="min-h-12 px-4" onClick={returnToSend}>
+                戻る
+              </Button>
+            ) : (
+              <Link
+                to={backTo}
+                className="inline-flex min-h-12 items-center justify-center rounded-xl border border-border bg-surface px-4 text-sm font-semibold text-ink"
+              >
+                戻る
+              </Link>
+            )}
+            <Button className="min-h-12 flex-1 text-base" disabled={saving} onClick={handleSave}>
+              {saving ? '保存中…' : fromSend ? '保存して送信確認へ' : '保存して発行'}
+            </Button>
+          </div>
+        </div>
       )}
 
       {pendingDelete != null && (

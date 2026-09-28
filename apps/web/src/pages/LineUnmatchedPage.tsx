@@ -62,25 +62,31 @@ export function LineUnmatchedPage() {
       <ul className="space-y-3">
         {items.map((item) => (
           <li key={item.lineUserId} className="rounded-2xl bg-surface p-4 shadow-sm">
-            <p className="break-all font-mono text-xs text-ink-2">{item.lineUserId}</p>
-            {item.lastText && (
-              <p className="mt-2 whitespace-pre-wrap text-sm text-ink">{item.lastText}</p>
+            <p className="text-base font-bold text-ink">{item.displayName || '名前未取得'}</p>
+            {item.lastText ? (
+              <div className="mt-2 rounded-xl bg-surface-2 px-3 py-2">
+                <p className="text-xs text-ink-3">最後のメッセージ</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-ink">{item.lastText}</p>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-ink-3">メッセージはまだありません</p>
             )}
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Link to={`/customers/new?lineUserId=${encodeURIComponent(item.lineUserId)}`}>
-                <Button variant="secondary" className="text-xs">
-                  新規顧客として登録
-                </Button>
+            <div className="mt-3 flex flex-col gap-2">
+              <Link
+                to={`/customers/new?lineUserId=${encodeURIComponent(item.lineUserId)}`}
+                className="flex min-h-12 w-full items-center justify-center rounded-xl bg-accent text-base font-semibold text-white active:opacity-80"
+              >
+                新しいお客様として登録
               </Link>
               <Button
                 variant="secondary"
-                className="text-xs"
+                className="min-h-12 w-full text-base"
                 onClick={() => {
                   setMatchId(item.lineUserId);
                   setQuery('');
                 }}
               >
-                既存顧客に紐付
+                登録済みのお客様と結びつける
               </Button>
             </div>
 

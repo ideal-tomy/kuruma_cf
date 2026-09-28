@@ -61,6 +61,23 @@ export async function sendLineMessage(
   }
 }
 
+export async function fetchLineDisplayName(
+  accessToken: string | undefined,
+  userId: string,
+): Promise<string | null> {
+  if (!accessToken) return null;
+  try {
+    const res = await fetch(`https://api.line.me/v2/bot/profile/${encodeURIComponent(userId)}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { displayName?: string };
+    return body.displayName?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function verifyLineSignature(
   secret: string | undefined,
   rawBody: string,

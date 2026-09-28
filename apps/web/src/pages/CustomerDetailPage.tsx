@@ -192,22 +192,20 @@ export function CustomerDetailPage() {
                           {formatKm(vehicle.initialMileage)}
                         </p>
                       </div>
-                      <div className="flex shrink-0 flex-col gap-1">
-                        <Link
-                          to={`/quotes/${vehicle.id}`}
-                          className="rounded-lg bg-accent px-2 py-1 text-center text-xs font-semibold text-white"
-                        >
-                          見積
-                        </Link>
-                        <Button
-                          variant="ghost"
-                          className="px-2 py-1 text-xs"
-                          onClick={() => setEditingVehicleId(vehicle.id)}
-                        >
-                          編集
-                        </Button>
-                      </div>
+                      <Button
+                        variant="ghost"
+                        className="min-h-11 shrink-0 px-3 text-sm"
+                        onClick={() => setEditingVehicleId(vehicle.id)}
+                      >
+                        車両を編集
+                      </Button>
                     </div>
+                    <Link
+                      to={`/quotes/${vehicle.id}`}
+                      className="mt-3 flex min-h-12 w-full items-center justify-center rounded-xl bg-accent text-base font-semibold text-white active:opacity-80"
+                    >
+                      見積を見る・直す
+                    </Link>
                     {(historiesByVehicle[vehicle.id] ?? []).length > 0 && (
                       <div className="mt-3 border-t border-border pt-3">
                         <p className="text-xs font-bold text-ink-3">整備履歴</p>

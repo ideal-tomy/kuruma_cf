@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { previewNotification, sendNotification, type NotificationPreviewSummary } from '../../lib/api';
 import { isListRule, LIST_RULE_LABELS } from '../../lib/listRules';
+import { staffPreviewHref } from '../../lib/previewUrl';
 import type { SendFlowTarget } from '../../lib/sendFlow';
 import { Button } from '../ui/Button';
 import { Toast } from '../ui/Toast';
@@ -108,7 +109,7 @@ export function SendSheet({ target, open, onClose, onSent }: Props) {
                   </Button>
                   {summary.portalUrl && (
                     <a
-                      href={summary.portalUrl}
+                      href={staffPreviewHref(summary.portalUrl)}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl border border-border bg-surface px-3 text-sm font-semibold text-accent"

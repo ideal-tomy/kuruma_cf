@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
-import { verifyLineSignature } from '../lib/line';
+import { fetchLineDisplayName, verifyLineSignature } from '../lib/line';
 import { newId } from '../lib/ids';
 import { nowIso } from '../lib/time';
 
@@ -38,12 +38,14 @@ webhookLine.post('/webhook/line', async (c) => {
         .first();
       if (!existing) {
         const ts = nowIso();
+        const displayName = await fetchLineDisplayName(c.env.LINE_CHANNEL_ACCESS_TOKEN, userId);
         await c.env.DB.prepare(
           `INSERT INTO line_unmatched (id, line_user_id, display_name, created_at)
            VALUES (?, ?, ?, ?)
-           ON CONFLICT(line_user_id) DO NOTHING`,
+           ON CONFLICT(line_user_id) DO UPDATE SET
+             display_name = COALESCE(excluded.display_name, line_unmatched.display_name)`,
         )
-          .bind(newId(), userId, null, ts)
+          .bind(newId(), userId, displayName, ts)
           .run();
       }
     } else if (event.type === 'unfollow') {
@@ -71,14 +73,16 @@ webhookLine.post('/webhook/line', async (c) => {
         .first();
       if (!matched && text) {
         const ts = nowIso();
+        const displayName = await fetchLineDisplayName(c.env.LINE_CHANNEL_ACCESS_TOKEN, userId);
         await c.env.DB.prepare(
           `INSERT INTO line_unmatched (id, line_user_id, display_name, last_text, last_message_at, created_at)
            VALUES (?, ?, ?, ?, ?, ?)
            ON CONFLICT(line_user_id) DO UPDATE SET
+             display_name = COALESCE(excluded.display_name, line_unmatched.display_name),
              last_text = excluded.last_text,
              last_message_at = excluded.last_message_at`,
         )
-          .bind(newId(), userId, text.slice(0, 40), text, ts, ts)
+          .bind(newId(), userId, displayName, text, ts, ts)
           .run();
       }
     }

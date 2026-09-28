@@ -13,7 +13,7 @@ export function AppShell() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-lg flex-col bg-bg">
-      <header className="sticky top-0 z-10 flex shrink-0 items-center justify-between border-b border-border bg-surface/95 px-4 py-3 backdrop-blur-sm">
+      <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface/95 px-4 backdrop-blur-sm">
         <h1 className="text-lg font-bold text-ink">Shaken Notify</h1>
         <Button variant="ghost" className="min-h-11 px-2 py-1 text-xs" onClick={() => logout()}>
           ログアウト
@@ -33,7 +33,7 @@ export function AppShell() {
             顧客
           </NavLink>
           <NavLink to="/line-unmatched" className={linkClass}>
-            LINE
+            未紐付
           </NavLink>
           <NavLink to="/history" className={linkClass}>
             履歴
