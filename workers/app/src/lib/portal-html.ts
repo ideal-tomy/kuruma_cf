@@ -69,7 +69,16 @@ export function renderPortalError(title: string, message?: string): string {
   );
 }
 
-export function renderCustomerPortal(data: PortalData, issuer: IssuerProfile | null): string {
+function withStaffPreview(url: string, staffPreview: boolean): string {
+  if (!staffPreview) return url;
+  return url.includes('?') ? `${url}&preview=1` : `${url}?preview=1`;
+}
+
+export function renderCustomerPortal(
+  data: PortalData,
+  issuer: IssuerProfile | null,
+  editHref?: string | null,
+): string {
   const days = data.daysUntilInspection;
   const showAlert = days != null && days <= 90;
   const q = data.latestQuote;
@@ -82,7 +91,7 @@ export function renderCustomerPortal(data: PortalData, issuer: IssuerProfile | n
         ${q.legalLines.map((l) => `<div class="line"><span>${esc(l.label)}</span><span>${yen(l.amount)}</span></div>`).join('')}
         <div class="section">${esc(QUOTE_SECTION_LABEL.inspection)} / ${esc(QUOTE_SECTION_LABEL.additional)}</div>
         ${q.serviceLines.map((l) => `<div class="line"><span>${esc(l.label)}</span><span>${yen(l.amount)}</span></div>`).join('')}
-        ${q.printUrl ? `<p style="margin-top:12px"><a class="btn btn-primary" href="${esc(q.printUrl)}">印刷・PDF保存</a></p>` : ''}
+        ${q.printUrl ? `<p style="margin-top:12px"><a class="btn btn-primary" href="${esc(withStaffPreview(q.printUrl, Boolean(editHref)))}">印刷・PDF保存</a></p>` : ''}
         ${issuer?.phone ? `<p style="margin-top:8px"><a class="btn btn-primary" href="tel:${esc(issuer.phone)}">お問い合わせ</a></p>` : ''}
       </div>`
     : '';
@@ -107,6 +116,7 @@ export function renderCustomerPortal(data: PortalData, issuer: IssuerProfile | n
   return layout(
     `${data.customerName} 様 — マイページ`,
     `<div class="shell">
+      ${editHref ? `<p class="no-print" style="margin-bottom:12px"><a class="btn btn-primary" href="${esc(editHref)}">見積を編集</a></p>` : ''}
       <div class="card">
         ${issuer?.companyName ? `<div class="label">${esc(issuer.companyName)}</div>` : ''}
         <div class="label">こんにちは</div>
@@ -130,6 +140,7 @@ export function renderCustomerPortal(data: PortalData, issuer: IssuerProfile | n
 
 export function renderQuoteDocument(args: {
   issuer: IssuerProfile | null;
+  editHref?: string | null;
   customerName: string;
   maker: string;
   model: string;
@@ -167,7 +178,10 @@ export function renderQuoteDocument(args: {
   return layout(
     '見積書',
     `<div class="quote-doc">
-      <p class="no-print" style="margin-bottom:16px"><button onclick="window.print()" class="btn btn-primary">印刷</button></p>
+      <p class="no-print" style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="window.print()" class="btn btn-primary">印刷</button>
+        ${args.editHref ? `<a class="btn btn-primary" href="${esc(args.editHref)}">見積を編集</a>` : ''}
+      </p>
       <h1>見積書</h1>
       <div class="meta">
         <div>

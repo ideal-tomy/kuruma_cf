@@ -14,6 +14,46 @@ function copyText(text: string) {
   void navigator.clipboard.writeText(text);
 }
 
+function sameOriginHref(absoluteUrl: string): string {
+  const parsed = new URL(absoluteUrl, window.location.origin);
+  return `${window.location.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
+}
+
+function staffPreviewHref(absoluteUrl: string): string {
+  const parsed = new URL(absoluteUrl, window.location.origin);
+  const next = new URL(`${parsed.pathname}${parsed.search}`, window.location.origin);
+  next.searchParams.set('preview', '1');
+  next.hash = parsed.hash;
+  return next.toString();
+}
+
+const EMPTY_SERVICE_LINE: QuoteLineItem = {
+  label: '',
+  amount: 0,
+  quantity: 1,
+  unit_price: 0,
+  tax_treatment: 'TAXABLE_10',
+  category: 'service',
+};
+
+function quantityDraftKey(section: 'legal' | 'service', index: number) {
+  return `${section}:${index}`;
+}
+
+function TrashIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4 7h16M9 7V5h6v2M8 7l1 13h6l1-13"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function QuoteEditPage() {
   const { vehicleId } = useParams<{ vehicleId: string }>();
   const location = useLocation();
@@ -32,6 +72,9 @@ export function QuoteEditPage() {
   const [portalUrl, setPortalUrl] = useState<string | null>(null);
   const [optOutUrl, setOptOutUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<number | null>(null);
+  const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -61,6 +104,7 @@ export function QuoteEditPage() {
     }
     setPortalUrl(data.portalUrl);
     setOptOutUrl(data.optOutUrl);
+    setQuantityDrafts({});
   }, [vehicleId]);
 
   useEffect(() => {
@@ -89,12 +133,47 @@ export function QuoteEditPage() {
     setServiceItems(q.serviceItems);
     setNotes(q.notes ?? '');
     setShareUrl(data.shareUrlsByQuoteId[id] ?? null);
+    setQuantityDrafts({});
+  };
+
+  const applyQuantity = (section: 'legal' | 'service', index: number, quantity: number) => {
+    const q = Math.max(1, Math.round(quantity));
+    const setter = section === 'legal' ? setLegalItems : setServiceItems;
+    setter((items) =>
+      items.map((item, i) => {
+        if (i !== index) return item;
+        return { ...item, quantity: q, amount: q * item.unit_price };
+      }),
+    );
+  };
+
+  const handleQuantityChange = (section: 'legal' | 'service', index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return;
+    const key = quantityDraftKey(section, index);
+    setQuantityDrafts((drafts) => ({ ...drafts, [key]: value }));
+    if (value !== '') {
+      applyQuantity(section, index, Number(value));
+    }
+  };
+
+  const handleQuantityBlur = (section: 'legal' | 'service', index: number) => {
+    const key = quantityDraftKey(section, index);
+    const raw = quantityDrafts[key];
+    setQuantityDrafts((drafts) => {
+      if (!(key in drafts)) return drafts;
+      const next = { ...drafts };
+      delete next[key];
+      return next;
+    });
+    if (raw === undefined) return;
+    const parsed = raw === '' ? 1 : Math.max(1, Math.round(Number(raw)) || 1);
+    applyQuantity(section, index, parsed);
   };
 
   const updateLine = (
     section: 'legal' | 'service',
     index: number,
-    field: 'label' | 'unit_price' | 'quantity',
+    field: 'label' | 'unit_price',
     value: string,
   ) => {
     const setter = section === 'legal' ? setLegalItems : setServiceItems;
@@ -103,14 +182,20 @@ export function QuoteEditPage() {
         if (i !== index) return item;
         if (field === 'label') return { ...item, label: value };
         const num = Number(value) || 0;
-        if (field === 'quantity') {
-          const quantity = Math.max(1, Math.round(num));
-          return { ...item, quantity, amount: quantity * item.unit_price };
-        }
         const unit_price = Math.round(num);
         return { ...item, unit_price, amount: item.quantity * unit_price };
       }),
     );
+  };
+
+  const addServiceLine = () => {
+    setServiceItems((items) => [...items, { ...EMPTY_SERVICE_LINE }]);
+  };
+
+  const removeServiceLine = (index: number) => {
+    setServiceItems((items) => items.filter((_, i) => i !== index));
+    setPendingDelete(null);
+    setQuantityDrafts({});
   };
 
   if (!vehicleId) return null;
@@ -127,19 +212,41 @@ export function QuoteEditPage() {
     );
   }
 
-  const renderSection = (title: string, section: 'legal' | 'service', items: QuoteLineItem[]) => (
+  const renderSection = (
+    title: string,
+    section: 'legal' | 'service',
+    items: QuoteLineItem[],
+    mutable = false,
+  ) => (
     <section className="rounded-2xl bg-surface p-4 shadow-sm">
       <h3 className="text-sm font-bold text-accent">{title}</h3>
+      {items.length === 0 && (
+        <p className="mt-3 text-sm text-ink-3">項目はまだありません</p>
+      )}
       <ul className="mt-3 space-y-3">
         {items.map((item, index) => (
           <li key={`${section}-${index}`} className="space-y-2 border-b border-border pb-3 last:border-0">
-            <Field label="項目名">
-              <input
-                className={inputClass}
-                value={item.label}
-                onChange={(e) => updateLine(section, index, 'label', e.target.value)}
-              />
-            </Field>
+            <div className="flex items-start gap-2">
+              <div className="min-w-0 flex-1">
+                <Field label="項目名">
+                  <input
+                    className={inputClass}
+                    value={item.label}
+                    onChange={(e) => updateLine(section, index, 'label', e.target.value)}
+                  />
+                </Field>
+              </div>
+              {mutable && (
+                <button
+                  type="button"
+                  className="mt-6 inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl text-danger"
+                  aria-label="この項目を削除"
+                  onClick={() => setPendingDelete(index)}
+                >
+                  <TrashIcon />
+                </button>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <Field label="単価">
                 <input
@@ -153,8 +260,11 @@ export function QuoteEditPage() {
                 <input
                   className={inputClass}
                   inputMode="numeric"
-                  value={String(item.quantity)}
-                  onChange={(e) => updateLine(section, index, 'quantity', e.target.value)}
+                  value={
+                    quantityDrafts[quantityDraftKey(section, index)] ?? String(item.quantity)
+                  }
+                  onChange={(e) => handleQuantityChange(section, index, e.target.value)}
+                  onBlur={() => handleQuantityBlur(section, index)}
                 />
               </Field>
             </div>
@@ -162,6 +272,11 @@ export function QuoteEditPage() {
           </li>
         ))}
       </ul>
+      {mutable && (
+        <Button variant="secondary" className="mt-3 min-h-11 w-full" onClick={addServiceLine}>
+          項目を追加
+        </Button>
+      )}
     </section>
   );
 
@@ -223,7 +338,7 @@ export function QuoteEditPage() {
       ) : (
         <>
           {renderSection('法定費用（非課税）', 'legal', legalItems)}
-          {renderSection('点検基本料・追加整備（税込）', 'service', serviceItems)}
+          {renderSection('点検基本料・追加整備（税込）', 'service', serviceItems, true)}
 
           <section className="rounded-2xl bg-surface p-4 shadow-sm">
             <Field label="備考">
@@ -236,12 +351,18 @@ export function QuoteEditPage() {
             <p className="mt-4 text-right text-lg font-bold text-accent">
               合計 {formatPrice(grandTotal)}
             </p>
+            {saveError && <p className="mt-3 text-sm text-danger">{saveError}</p>}
             <div className="mt-4 flex flex-wrap gap-2">
               <Button
                 className="min-h-11 flex-1"
                 disabled={saving}
                 onClick={async () => {
                   if (!activeQuoteId) return;
+                  if (serviceItems.some((item) => !item.label.trim())) {
+                    setSaveError('項目名が空の行があります。名前を入れるか、その行を削除してください。');
+                    return;
+                  }
+                  setSaveError(null);
                   setSaving(true);
                   try {
                     await updateQuote(activeQuoteId, {
@@ -255,6 +376,8 @@ export function QuoteEditPage() {
                     if (fromSend) {
                       setTimeout(returnToSend, 500);
                     }
+                  } catch (err: unknown) {
+                    setSaveError(err instanceof Error ? err.message : '保存に失敗しました');
                   } finally {
                     setSaving(false);
                   }
@@ -279,6 +402,7 @@ export function QuoteEditPage() {
                   label="見積印刷"
                   description="見積詳細・印刷用ページ"
                   url={shareUrl}
+                  openHref={staffPreviewHref(shareUrl)}
                   copied={copied === 'quote'}
                   onCopy={() => {
                     copyText(shareUrl);
@@ -292,6 +416,7 @@ export function QuoteEditPage() {
                   label="顧客ポータル"
                   description="お車・見積概要（LINE 本文のリンク先）"
                   url={portalUrl}
+                  openHref={staffPreviewHref(portalUrl)}
                   copied={copied === 'portal'}
                   onCopy={() => {
                     copyText(portalUrl);
@@ -305,6 +430,7 @@ export function QuoteEditPage() {
                   label="配信停止"
                   description="顧客が案内を止めるとき用（通常は LINE 本文に含まれる）"
                   url={optOutUrl}
+                  openHref={sameOriginHref(optOutUrl)}
                   copied={copied === 'optout'}
                   onCopy={() => {
                     copyText(optOutUrl);
@@ -316,6 +442,45 @@ export function QuoteEditPage() {
             </ul>
           </section>
         </>
+      )}
+
+      {pendingDelete != null && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
+          role="presentation"
+          onClick={() => setPendingDelete(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-line-title"
+            className="w-full max-w-sm rounded-2xl bg-surface p-4 shadow-lg"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p id="delete-line-title" className="text-base font-bold text-ink">
+              この項目を削除しますか
+            </p>
+            <p className="mt-2 text-sm text-ink-2">
+              {serviceItems[pendingDelete]?.label.trim() || '（項目名なし）'}
+            </p>
+            <div className="mt-4 flex gap-2">
+              <Button
+                variant="secondary"
+                className="min-h-11 flex-1"
+                onClick={() => setPendingDelete(null)}
+              >
+                キャンセル
+              </Button>
+              <Button
+                variant="danger"
+                className="min-h-11 flex-1"
+                onClick={() => removeServiceLine(pendingDelete)}
+              >
+                削除
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

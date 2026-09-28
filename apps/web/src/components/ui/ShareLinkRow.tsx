@@ -4,11 +4,12 @@ type Props = {
   label: string;
   description?: string;
   url: string;
+  openHref?: string;
   copied: boolean;
   onCopy: () => void;
 };
 
-export function ShareLinkRow({ label, description, url, copied, onCopy }: Props) {
+export function ShareLinkRow({ label, description, url, openHref, copied, onCopy }: Props) {
   return (
     <li className="rounded-xl border border-border bg-surface px-3 py-3">
       <div className="flex items-start justify-between gap-2">
@@ -19,7 +20,7 @@ export function ShareLinkRow({ label, description, url, copied, onCopy }: Props)
       </div>
       <div className="mt-3 flex gap-2">
         <a
-          href={url}
+          href={openHref ?? url}
           target="_blank"
           rel="noreferrer"
           className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl border border-border bg-surface-2 px-3 text-sm font-semibold text-accent"

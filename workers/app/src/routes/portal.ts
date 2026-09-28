@@ -39,18 +39,18 @@ portal.get('/p/:token', async (c) => {
     );
   }
 
-  const site = (c.env.SITE_URL ?? 'http://localhost:8788').replace(/\/$/, '');
   const data = await loadPortalData(
     c.env.DB,
     decoded.customerId,
-    site,
     c.env.QUOTE_SHARE_SECRET ?? '',
     (quoteId) => buildQuoteShareToken(c.env.QUOTE_SHARE_SECRET!, quoteId),
   );
   if (!data) return c.html(renderPortalError('お客様情報が見つかりません'), 404);
 
   const issuer = parseIssuerFromJson(c.env.ISSUER_JSON);
-  return c.html(renderCustomerPortal(data, issuer));
+  const editHref =
+    c.req.query('preview') === '1' && data.vehicleId ? `/quotes/${data.vehicleId}` : null;
+  return c.html(renderCustomerPortal(data, issuer, editHref));
 });
 
 portal.get('/q/:token', async (c) => {
@@ -96,9 +96,11 @@ portal.get('/q/:token', async (c) => {
   });
 
   const issuer = parseIssuerFromJson(c.env.ISSUER_JSON);
+  const editHref = c.req.query('preview') === '1' ? `/quotes/${vehicle.id}` : null;
   return c.html(
     renderQuoteDocument({
       issuer,
+      editHref,
       customerName: customer?.name ?? 'お客様',
       maker: vehicle.maker,
       model: vehicle.model,

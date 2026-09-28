@@ -16,6 +16,7 @@ export type PortalQuoteSummary = {
 
 export type PortalData = {
   customerName: string;
+  vehicleId: string | null;
   maker: string;
   model: string;
   plate: string;
@@ -29,7 +30,6 @@ export type PortalData = {
 export async function loadPortalData(
   db: D1Database,
   customerId: string,
-  siteUrl: string,
   quoteShareSecret: string,
   buildQuoteToken: (quoteId: string) => Promise<string>,
 ): Promise<PortalData | null> {
@@ -46,6 +46,7 @@ export async function loadPortalData(
   if (!vehicle) {
     return {
       customerName: customer.name,
+      vehicleId: null,
       maker: '—',
       model: '—',
       plate: '—',
@@ -109,12 +110,13 @@ export async function loadPortalData(
         amount: i.amount,
         category: i.category,
       })),
-      printUrl: token ? `${siteUrl}/q/${token}` : null,
+      printUrl: token ? `/q/${token}` : null,
     };
   }
 
   return {
     customerName: customer.name,
+    vehicleId: vehicle.id,
     maker: vehicle.maker,
     model: vehicle.model,
     plate: vehicle.plate,
